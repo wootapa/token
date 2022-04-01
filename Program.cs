@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Pastel;
 
 try
 {
@@ -33,14 +35,20 @@ try
     };
     tokenRequest.Headers.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.Default.GetBytes(clientId + ":" + secret)));
 
-    // Create tasks - request and progress-spinner
-    var task1 = client.SendAsync(tokenRequest);
-    var task2 = Task.Run(async () =>
+    // Create tasks - accessToken and progress-spinner
+    var accessTokenTask = Task.Run(async () =>
+    {
+        using var response = await client.SendAsync(tokenRequest);
+        response.EnsureSuccessStatusCode();
+        var str = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<OAuthResponse>(str).access_token;
+    });
+    var spinnerTask = Task.Run(async () =>
     {
         Console.CursorVisible = false;
         int i = 0;
 
-        while (!task1.IsCompleted)
+        while (!accessTokenTask.IsCompleted)
         {
             switch (i++ % 4)
             {
@@ -51,18 +59,20 @@ try
             }
             await Task.Delay(100);
         }
-        Console.Write("\r"); 
+        Console.Write("\r");
         Console.CursorVisible = true;
     });
 
     // Wait...
-    await Task.WhenAll(new List<Task> { task1, task2 });
+    await Task.WhenAll(new List<Task> { spinnerTask, accessTokenTask });
 
     // Print token
-    using var response = task1.Result.Content.ReadAsStream();
-    var accessToken = JsonSerializer.Deserialize<OAuthResponse>(response).access_token;
-    Console.ForegroundColor = ConsoleColor.Blue;
-    Console.WriteLine(accessToken);
+    var accessToken = accessTokenTask.Result;
+    var parts = accessToken.Split('.');
+    Console.WriteLine(
+        parts[0].Pastel(Color.FromArgb(251, 1, 91)) + "." +
+        parts[1].Pastel(Color.FromArgb(214, 58, 255)) + "." +
+        parts[2].Pastel(Color.FromArgb(0, 185, 241)));
 
     // Print payload?
     if (printPayload)
@@ -74,13 +84,13 @@ try
             case 3: payload += "="; break;
         }
         var payloadDecoded = Encoding.Default.GetString(Convert.FromBase64String(payload));
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        var jsonElement = JsonSerializer.Deserialize<JsonElement>(payloadDecoded);
-        var payloadPretty = JsonSerializer.Serialize(jsonElement, options);
+        var payloadPretty = JsonSerializer.Serialize(
+            JsonSerializer.Deserialize<JsonElement>(payloadDecoded),
+            new JsonSerializerOptions { WriteIndented = true }
+        );
 
         Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine(payloadPretty);
+        Console.WriteLine(payloadPretty.Pastel(Color.FromArgb(214, 58, 255)));
     }
 
     Environment.Exit(0);
