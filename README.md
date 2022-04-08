@@ -1,9 +1,11 @@
 # token - prints accesstoken (OAuth Client Credentials Flow)
 
-```Shell
-docker run --rm wootapa/token ${TOKENURI} ${CLIENTID} ${SECRET} --decode
+```shell
+docker run --rm wootapa/token <token_url> <client_id> <secret> [options...]
 ```
 
-`--decode` is optional and prints the decoded payload
+Options:  
+`--decode` is optional and also prints the decoded payload  
+`--decodeonly` is optional and only prints the decoded payload
 
 ![](usage.gif)

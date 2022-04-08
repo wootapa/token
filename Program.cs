@@ -15,12 +15,15 @@ try
     var clientId = args.Skip(1)?.FirstOrDefault();
     var secret = args.Skip(2)?.FirstOrDefault();
     bool printPayload = args.Skip(3)?.FirstOrDefault()?.Equals("--decode") ?? false;
+    bool printPayloadOnly = args.Skip(3)?.FirstOrDefault()?.Equals("--decodeonly") ?? false;
 
     if (url is null ||
         clientId is null ||
         secret is null)
     {
-        Console.WriteLine("Usage: token.exe <token_url> <client_id> <secret> --decode (optional)");
+        Console.WriteLine("Usage: token.exe <token_url> <client_id> <secret> [options...]");
+        Console.WriteLine("--decode, print the decoded payload");
+        Console.WriteLine("--decodeonly, print only the decoded payload");
         Environment.Exit(1);
     }
 
@@ -66,18 +69,27 @@ try
     // Wait...
     await Task.WhenAll(new List<Task> { spinnerTask, accessTokenTask });
 
-    // Print token
+    // Print token?
     var accessToken = accessTokenTask.Result;
     var parts = accessToken.Split('.');
-    Console.WriteLine(
-        parts[0].Pastel(Color.FromArgb(251, 1, 91)) + "." +
-        parts[1].Pastel(Color.FromArgb(214, 58, 255)) + "." +
-        parts[2].Pastel(Color.FromArgb(0, 185, 241)));
+
+    if (!printPayloadOnly)
+    {
+        Console.WriteLine(
+            parts[0].Pastel(Color.FromArgb(251, 1, 91)) + "." +
+            parts[1].Pastel(Color.FromArgb(214, 58, 255)) + "." +
+            parts[2].Pastel(Color.FromArgb(0, 185, 241)));
+
+        if (printPayload)
+        {
+            Console.WriteLine();
+        }
+    }
 
     // Print payload?
-    if (printPayload)
+    if (printPayload || printPayloadOnly)
     {
-        var payload = accessToken.Split('.')[1].Replace('_', '/').Replace('-', '+');
+        var payload = parts[1].Replace('_', '/').Replace('-', '+');
         switch (payload.Length % 4)
         {
             case 2: payload += "=="; break;
@@ -88,8 +100,6 @@ try
             JsonSerializer.Deserialize<JsonElement>(payloadDecoded),
             new JsonSerializerOptions { WriteIndented = true }
         );
-
-        Console.WriteLine();
         Console.WriteLine(payloadPretty.Pastel(Color.FromArgb(214, 58, 255)));
     }
 
@@ -97,6 +107,6 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine("Whoops: " + ex);
+    Console.WriteLine("Whoops: " + ex.ToString());
     Environment.Exit(1);
 }
